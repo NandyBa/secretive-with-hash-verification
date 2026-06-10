@@ -43,7 +43,12 @@ extension SecureEnclave {
                 context = unsafe existing.context
             } else {
                 let newContext = LAContext()
-                newContext.localizedReason = String(localized: .authContextRequestSignatureDescription(appName: provenance.origin.displayName, secretName: secret.name))
+                var reason = String(localized: .authContextRequestSignatureDescription(appName: provenance.origin.displayName, secretName: secret.name))
+                // Append a hash of the exact bytes about to be signed so the user can compare it
+                // against a hash they compute themselves from the same bytes (e.g. in their terminal).
+                // This does not change what is signed; `data` is passed verbatim to `key.signature(for:)` below.
+                reason += Self.signaturePreview(for: data)
+                newContext.localizedReason = reason
                 newContext.localizedCancelTitle = String(localized: .authContextRequestDenyButton)
                 context = newContext
             }
@@ -284,6 +289,52 @@ extension SecureEnclave.Store {
 }
 
 extension SecureEnclave.Store {
+
+    /// Builds a human-readable preview of the bytes that are about to be signed, for display in the
+    /// authentication prompt. The central element is the SHA-256 of the *raw* `data` payload (the exact
+    /// second chunk of the SSH SIGN_REQUEST, i.e. the full SSHSIG blob for a git commit signature),
+    /// which the user can reproduce from the same bytes to confirm what they are authorizing.
+    ///
+    /// When `data` is an SSHSIG payload, the namespace (expected to be `"git"`) and hash algorithm are
+    /// also surfaced. Non-SSHSIG payloads (plain SSH authentication) still get the SHA-256, with no SSHSIG line.
+    /// - Parameter data: The exact bytes that will be passed to the signing key.
+    /// - Returns: A string to append to the authentication prompt's reason, beginning with a blank line.
+    static func signaturePreview(for data: Data) -> String {
+        let digest = SHA256.hash(data: data)
+        let digestData = unsafe digest.withUnsafeBytes { unsafe Data($0) }
+        let hex = digestData.map { ("0" + String($0, radix: 16, uppercase: false)).suffix(2) }.joined()
+        var preview = "\n\nSHA-256: \(hex)"
+        if let info = sshsigInfo(from: data) {
+            preview += "\nSSHSIG namespace: \"\(info.namespace)\", hash: \(info.hashAlgorithm)"
+        }
+        return preview
+    }
+
+    /// Parses the leading fields of an SSHSIG signature payload, if `data` is one.
+    ///
+    /// SSHSIG signed data is: the literal 6-byte preamble `"SSHSIG"`, followed by length-prefixed
+    /// (big-endian UInt32) strings `namespace`, `reserved`, `hash_algorithm`, then `H(message)`.
+    /// See https://github.com/openssh/openssh-portable/blob/master/PROTOCOL.sshsig
+    /// - Parameter data: Candidate SSHSIG payload.
+    /// - Returns: The namespace and hash algorithm, or `nil` if `data` is not an SSHSIG payload or is malformed.
+    static func sshsigInfo(from data: Data) -> (namespace: String, hashAlgorithm: String)? {
+        let magic = Data("SSHSIG".utf8)
+        guard data.count > magic.count, data.prefix(magic.count) == magic else { return nil }
+        var offset = data.startIndex + magic.count
+        func readString() -> String? {
+            guard offset + 4 <= data.endIndex else { return nil }
+            let length = data[offset..<offset + 4].reduce(0) { ($0 << 8) | Int($1) }
+            offset += 4
+            guard length >= 0, offset + length <= data.endIndex else { return nil }
+            let string = String(decoding: data[offset..<offset + length], as: UTF8.self)
+            offset += length
+            return string
+        }
+        guard let namespace = readString() else { return nil }
+        _ = readString() // reserved
+        guard let hashAlgorithm = readString() else { return nil }
+        return (namespace, hashAlgorithm)
+    }
 
     enum Constants {
         static let keyClass = kSecClassGenericPassword as String
