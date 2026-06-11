@@ -29,6 +29,55 @@ This README and the tools below (`git-me`, `git-me-signer.py`, `agent-sign-hash.
 reproduce that hash on the terminal side and compare the two, so you can confirm the signature
 you authorize matches the commit in front of you.
 
+## Building this fork with your own Apple identity
+
+The source carries no personal identity — building for yourself is **config only**. Set your
+bundle ID prefix and Apple team in the gitignored `Sources/Config/OpenSource.xcconfig`, and the
+bundle IDs, XPC service names, and code-signing requirements all follow:
+
+```
+# Sources/Config/OpenSource.xcconfig  (gitignored — your machine only)
+SECRETIVE_BASE_BUNDLE_ID_OSS = com.yourname.Secretive
+SECRETIVE_DEVELOPMENT_TEAM_OSS = YOURTEAMID
+```
+
+Find your Team ID (the `OU` of your signing certificate):
+
+```sh
+security find-certificate -c "Apple Development: you@example.com" -p \
+  | openssl x509 -noout -subject -nameopt sep_multiline | grep OU=
+```
+
+Add your Apple ID in Xcode (Settings ▸ Accounts), then build, install and point your shell at
+the agent (Debug builds use `socket-debug.ssh`):
+
+```sh
+xcodebuild -project Sources/Secretive.xcodeproj -scheme Secretive \
+  -configuration Debug -derivedDataPath build -allowProvisioningUpdates build
+ditto build/Build/Products/Debug/Secretive.app /Applications/Secretive.app
+open /Applications/Secretive.app    # then approve the login item in System Settings
+
+export SSH_AUTH_SOCK="$HOME/Library/Containers/<your-base>.SecretAgent/Data/socket-debug.ssh"
+```
+
+What makes this config-only (these are this fork's build changes vs upstream, which would
+otherwise need a source `replaceAll`):
+
+- **XPC service names** are derived from the running bundle ID (`Bundle.secretiveBaseBundleID`)
+  instead of hardcoded, so they follow `SECRETIVE_BASE_BUNDLE_ID`.
+- **The team ID** is read from the running code signature (`kSecCodeInfoTeamIdentifier`) rather
+  than a hardcoded constant or the `com.apple.developer.team-identifier` entitlement (absent on
+  some targets on personal teams).
+- **`com.apple.security.hardened-process.*` entitlements are removed** — personal Apple teams
+  reject them; harmless on a paid team (re-add them in the `.entitlements` files if you have a
+  paid team and want the extra hardening).
+
+Caveats:
+
+- A Secure Enclave key is bound to the signing team; a key created under a different team (e.g.
+  the official app's) is not visible to your build — create a new one in the app.
+- A free Apple team's provisioning profiles expire after 7 days, so you'll rebuild periodically.
+
 ## What bytes are hashed
 
 The hash is computed over the **raw `data` field of the SSH `SIGN_REQUEST`** — the second
