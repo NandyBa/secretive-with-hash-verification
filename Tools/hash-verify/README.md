@@ -25,7 +25,7 @@ The single code change lives in
 - The result is appended to the `LAContext.localizedReason`. Nothing about what is signed
   changes; it is display-only. CryptoKit + standard library only (Secretive's founding rule).
 
-This README and the tools below (`git-me`, `git-me-signer.py`, `agent-sign-hash.py`) let you
+This README and the tools below (`git-seal`, `git-seal-signer.py`, `agent-sign-hash.py`) let you
 reproduce that hash on the terminal side and compare the two, so you can confirm the signature
 you authorize matches the commit in front of you.
 
@@ -107,11 +107,11 @@ This setup uses two separate SSH signing identities with distinct jobs:
 | Key | Where it lives | Protection | How it signs | Its job |
 |-----|----------------|------------|--------------|---------|
 | **`sign-ai`** | a file on disk (`~/.ssh/sign-ai`), no passphrase | filesystem permissions | automatically, no prompt | the **default** signature on every commit — makes commits show as **Verified** on GitHub and proves they come from **your machine(s)**, including ones an **AI** assistant makes for you |
-| **`sign-me`** | the Secure Enclave, via Secretive (non-exportable) | Touch ID on every use | only when you ask, via `git me` | **marks the commits you made by hand** — a deliberate, human signature that distinguishes your manual work from automated commits; this is where the fork shows you the hash of what you sign |
+| **`sign-me`** | the Secure Enclave, via Secretive (non-exportable) | Touch ID on every use | only when you ask, via `git seal` | **marks the commits you made by hand** — a deliberate, human signature that distinguishes your manual work from automated commits; this is where the fork shows you the hash of what you sign |
 
 So `sign-ai` answers *"did this come from my machine?"* — it signs everything automatically so all
 your commits are Verified on GitHub (provenance). `sign-me` answers *"did I personally make this
-one?"* — a deliberate, Touch-ID-protected human signature, applied via `git me`, where you also
+one?"* — a deliberate, Touch-ID-protected human signature, applied via `git seal`, where you also
 check the hash of exactly what's being signed.
 
 ### Create the keys
@@ -134,16 +134,16 @@ git config --global user.signingkey ~/.ssh/sign-ai.pub
 git config --global commit.gpgsign true
 ```
 
-`git me` (below) overrides the key for a single commit, switching to `sign-me` plus the
+`git seal` (below) overrides the key for a single commit, switching to `sign-me` plus the
 hash-printing signer. Nothing else in your everyday git usage changes.
 
 Finally, add **both** public keys to GitHub ▸ Settings ▸ *SSH and GPG keys* as **Signing Keys**,
 so commits from either show up as *Verified*.
 
-## `git me`: sign with the Secure Enclave key and see the hash live
+## `git seal`: sign with the Secure Enclave key and see the hash live
 
 The workflow: the default on-disk key (`sign-ai`) auto-signs ordinary commits, while your
-personal Secure Enclave key (`sign-me`, Touch ID protected) is used only via `git me`, which
+personal Secure Enclave key (`sign-me`, Touch ID protected) is used only via `git seal`, which
 prints the SHA-256 in the terminal so you can compare it with the prompt.
 
 ### How git invokes the signer
@@ -159,31 +159,31 @@ The **message** (the commit payload) is passed in a **temp file** as the last ar
 on stdin. The signing program then computes `H = SHA-512(message)`, assembles the SSHSIG blob,
 and sends it to the agent. So a wrapper around `gpg.ssh.program` sees only the *message*; to
 get the hash Secretive shows, it must **reconstruct** the blob (deterministically). That is
-exactly what `git-me-signer.py` does, and its output matches the agent's bytes exactly
+exactly what `git-seal-signer.py` does, and its output matches the agent's bytes exactly
 (verified against `agent-sign-hash.py`).
 
 ### Install
 
-`git-me-signer.py` — the wrapper that replaces `ssh-keygen`, reconstructs the blob, and prints
-its SHA-256. `git-me` — a thin dispatcher so `git me ...` commits with the `sign-me` key using
-that wrapper. Put `git-me` on your `PATH` (git runs `git-me` for the `git me` subcommand):
+`git-seal-signer.py` — the wrapper that replaces `ssh-keygen`, reconstructs the blob, and prints
+its SHA-256. `git-seal` — a thin dispatcher so `git seal ...` commits with the `sign-me` key using
+that wrapper. Put `git-seal` on your `PATH` (git runs `git-seal` for the `git seal` subcommand):
 
 ```sh
-chmod +x Tools/hash-verify/git-me-signer.py Tools/hash-verify/git-me
-cp Tools/hash-verify/git-me ~/bin/git-me      # ~/bin must be on $PATH
-# edit ~/bin/git-me if your repo path or signing-key path differ
+chmod +x Tools/hash-verify/git-seal-signer.py Tools/hash-verify/git-seal
+cp Tools/hash-verify/git-seal ~/bin/git-seal      # ~/bin must be on $PATH
+# edit ~/bin/git-seal if your repo path or signing-key path differ
 ```
 
 ### Use
 
 ```sh
-git me -m "my commit"
+git seal -m "my commit"
 ```
 
-1. `git-me-signer.py` prints, **before** the Touch ID prompt:
+1. `git-seal-signer.py` prints, **before** the Touch ID prompt:
    ```
-   [git me] SHA-256 to sign: <hex>
-   [git me] namespace="git" hash=sha512  (95 bytes)
+   [git seal] SHA-256 to sign: <hex>
+   [git seal] namespace="git" hash=sha512  (95 bytes)
    ```
 2. Secretive shows the **same** `SHA-256` in the Touch ID prompt.
 3. Compare the two, then approve with Touch ID.
@@ -194,22 +194,22 @@ No proxy is needed for daily use — the wrapper alone produces the terminal-sid
 ### Why `/dev/tty`
 
 git captures the signing program's stdout/stderr and only surfaces them **if signing fails**.
-On success a plain stderr write is swallowed. `git-me-signer.py` therefore writes the hash line
+On success a plain stderr write is swallowed. `git-seal-signer.py` therefore writes the hash line
 to the controlling terminal (`/dev/tty`), which bypasses git's capture and shows it live, and
 falls back to stderr when there is no controlling terminal (headless/non-interactive context).
 
 ### Dump the exact bytes (optional)
 
-Set `GIT_ME_DUMP` to write the reconstructed blob (hex) to a file for inspection:
+Set `GIT_SEAL_DUMP` to write the reconstructed blob (hex) to a file for inspection:
 
 ```sh
-GIT_ME_DUMP=/tmp/blob.hex git me -m "x"
+GIT_SEAL_DUMP=/tmp/blob.hex git seal -m "x"
 python3 -c "import hashlib; print(hashlib.sha256(bytes.fromhex(open('/tmp/blob.hex').read())).hexdigest())"
 ```
 
 ## Alternative: capture the literal wire bytes with `agent-sign-hash.py`
 
-`git-me-signer.py` *reconstructs* the blob. If you'd rather observe the **literal** bytes the
+`git-seal-signer.py` *reconstructs* the blob. If you'd rather observe the **literal** bytes the
 agent receives (no reconstruction), `agent-sign-hash.py` is a transparent proxy that sits on
 the agent socket, forwards every byte untouched, and prints the SHA-256 of each sign request's
 `data` field. It's also how this tooling was verified: reconstruction == wire bytes == prompt.
