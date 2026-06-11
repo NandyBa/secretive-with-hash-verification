@@ -100,9 +100,48 @@ Secretive hashes this **entire blob**, not just the inner `H(message)`. Encoding
 For non-SSHSIG requests (plain SSH authentication), the same SHA-256 of the raw `data` is
 shown, without the SSHSIG line.
 
+## The two signing keys: `sign-ai` and `sign-me`
+
+This setup uses two separate SSH signing identities, one per level of trust:
+
+| Key | Where it lives | Protection | How it signs | Used for |
+|-----|----------------|------------|--------------|----------|
+| **`sign-ai`** | a file on disk (`~/.ssh/sign-ai`), no passphrase | filesystem permissions | automatically, no prompt | routine / automated commits — e.g. ones an **AI** coding assistant makes for you |
+| **`sign-me`** | the Secure Enclave, via Secretive (non-exportable) | Touch ID on every use | only after you approve | commits *you* personally vouch for, made on purpose via `git me` |
+
+The idea: let low-stakes, high-volume commits flow without friction (`sign-ai`), but require a
+deliberate, verified human action for the ones that matter (`sign-me`) — and that's exactly where
+this fork shows you the hash of what you're about to sign.
+
+### Create the keys
+
+```sh
+# sign-ai: on-disk key, no passphrase so it signs non-interactively
+ssh-keygen -t ed25519 -f ~/.ssh/sign-ai -N "" -C "sign-ai"
+```
+
+`sign-me` is created inside the Secretive app (Secure Enclave, "require authentication"); export
+its public key to a file, e.g. `~/.ssh/secretive_sign-me.pub`.
+
+### Wire them into git
+
+`sign-ai` is the default, so ordinary commits are signed automatically with no prompt:
+
+```sh
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/sign-ai.pub
+git config --global commit.gpgsign true
+```
+
+`git me` (below) overrides the key for a single commit, switching to `sign-me` plus the
+hash-printing signer. Nothing else in your everyday git usage changes.
+
+Finally, add **both** public keys to GitHub ▸ Settings ▸ *SSH and GPG keys* as **Signing Keys**,
+so commits from either show up as *Verified*.
+
 ## `git me`: sign with the Secure Enclave key and see the hash live
 
-The workflow: a default on-disk key (`sign-ai`) auto-signs ordinary commits, while your
+The workflow: the default on-disk key (`sign-ai`) auto-signs ordinary commits, while your
 personal Secure Enclave key (`sign-me`, Touch ID protected) is used only via `git me`, which
 prints the SHA-256 in the terminal so you can compare it with the prompt.
 
