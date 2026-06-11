@@ -9,35 +9,39 @@ Secretive is an app for protecting and managing SSH keys with the Secure Enclave
 </picture>
 
 
-## This fork — signature hash verification (by [Nandy Bâ](https://github.com/NandyBa))
+## This fork — check what you sign (by [Nandy Bâ](https://github.com/NandyBa))
 
-This is a fork of Secretive maintained by **Nandy Bâ ([@NandyBa](https://github.com/NandyBa))**.
-It adds one focused capability on top of upstream Secretive: when the agent asks you to authorize
-a signature, the **Touch ID prompt also shows the SHA-256 of the exact bytes it is about to
-sign** (plus the SSHSIG `namespace` and hash algorithm for git commits).
+Secretive keeps a secret key locked inside a special chip on your Mac (the Secure Enclave). A small
+background program — the **SSH agent** — uses that key to sign things, like proving a Git commit
+really came from you. Each time the agent is about to sign, your Mac asks you to confirm with Touch
+ID, which is what unlocks the key.
 
-### Why this matters
+This matters more than ever now that an **AI** coding assistant can write code and even make commits
+for you. The setup: the AI's routine commits are signed automatically by an ordinary key, while
+*your* important commits are signed with the Secure Enclave key, which only signs after you approve
+with Touch ID. The whole point is to be sure of *what* you're approving.
 
-Upstream Secretive tells you *which* key is signing and *which* app requested it — but not *what*
-is being signed. The agent only ever receives an opaque blob (never the commit message in clear),
-so it can't show the message — but it can show a hash of those exact bytes. By reproducing that
-same hash on your side, in the terminal, and comparing the two, you confirm that the signature you
-authorize really corresponds to the commit in front of you. That defeats a class of attacks where
-a compromised client asks you to sign something other than what's on screen.
+**The gap in the normal app:** the prompt tells you *which* key will sign and *which* app asked —
+but not *what* is being signed. A hacked program, or a confused AI agent, could show you one thing
+on screen and quietly ask the agent to sign something else.
 
-### What it brings
+**What this fork adds:** the prompt now also shows a short **code** — the SHA-256 of the exact data
+about to be signed. Change even one character of that data and the code comes out completely
+different. You recompute that same code yourself — from the commit in front of you, with the
+included `git me` command — and compare:
 
-- **A verifiable Touch ID prompt** — the SHA-256 of the precise payload being signed.
-- **A `git me` workflow** — signs a commit with your Secure Enclave key (Touch ID) and prints the
-  same hash in your terminal so you can compare it with the prompt before approving. Pairs with a
-  default on-disk key (`sign-ai`) that signs routine commits automatically, while `sign-me`
-  (Secure Enclave) is used deliberately via `git me`.
-- **Terminal-side verification tooling** — a signing wrapper and a transparent agent-socket proxy
-  that reproduce / capture the exact bytes, with no third-party dependencies.
+- same code → approve ✅
+- different code → stop ❌
 
-See **[`Tools/hash-verify/README.md`](Tools/hash-verify/README.md)** for the full details: which
-exact bytes are hashed, the `git me` setup, and how to build this fork under your own Apple
-identity (config-only — no source edits).
+Think of it like a checksum (a short summary number): the same data always gives the same code.
+
+Two honest notes. It doesn't *block* a bad signature on its own — it lets you *catch* one, as long
+as the code you compare against comes from something you trust (the commit you actually meant to
+make). And the signing itself is unchanged: the exact same data is used for the code you see and for
+what actually gets signed, so the two can't drift apart.
+
+> Want the technical details, or to build this version yourself? See
+> [`Tools/hash-verify/README.md`](Tools/hash-verify/README.md).
 
 ## Why?
 
