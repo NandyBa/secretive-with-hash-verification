@@ -29,7 +29,7 @@ on screen and quietly ask the agent to sign something else.
 **What this fork adds:** the prompt now also shows a short **code** — the SHA-256 of the exact data
 about to be signed. Change even one character of that data and the code comes out completely
 different. You recompute that same code yourself — from the commit in front of you, with the
-included `git me` command — and compare:
+included `git seal` command — and compare:
 
 - same code → approve ✅
 - different code → stop ❌

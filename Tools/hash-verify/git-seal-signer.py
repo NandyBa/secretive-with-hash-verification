@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Drop-in replacement for `gpg.ssh.program` (ssh-keygen) used by `git me`.
+Drop-in replacement for `gpg.ssh.program` (ssh-keygen) used by `git seal`.
 
 git invokes the signing program as:
     <program> -Y sign -n git -f <signing_key> <buffer_file>
@@ -24,7 +24,7 @@ import struct
 import sys
 
 REAL_SSH_KEYGEN = "/usr/bin/ssh-keygen"
-DUMP_FILE = os.environ.get("GIT_ME_DUMP")  # optional: path to write the raw blob (hex)
+DUMP_FILE = os.environ.get("GIT_SEAL_DUMP")  # optional: path to write the raw blob (hex)
 
 
 def sshstring(b: bytes) -> bytes:
@@ -77,9 +77,9 @@ def main():
         )
         sha256_hex = hashlib.sha256(blob).hexdigest()
         emit(
-            f"\n  \033[1m[git me] SHA-256 to sign: {sha256_hex}\033[0m\n"
-            f"  [git me] namespace=\"{namespace}\" hash=sha512  ({len(blob)} bytes)\n"
-            f"  [git me] -> compare with Secretive's Touch ID prompt, then approve\n\n"
+            f"\n  \033[1m[git seal] SHA-256 to sign: {sha256_hex}\033[0m\n"
+            f"  [git seal] namespace=\"{namespace}\" hash=sha512  ({len(blob)} bytes)\n"
+            f"  [git seal] -> compare with Secretive's Touch ID prompt, then approve\n\n"
         )
         if DUMP_FILE:
             with open(DUMP_FILE, "w") as f:
