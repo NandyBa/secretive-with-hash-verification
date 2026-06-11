@@ -102,16 +102,17 @@ shown, without the SSHSIG line.
 
 ## The two signing keys: `sign-ai` and `sign-me`
 
-This setup uses two separate SSH signing identities, one per level of trust:
+This setup uses two separate SSH signing identities with distinct jobs:
 
-| Key | Where it lives | Protection | How it signs | Used for |
-|-----|----------------|------------|--------------|----------|
-| **`sign-ai`** | a file on disk (`~/.ssh/sign-ai`), no passphrase | filesystem permissions | automatically, no prompt | routine / automated commits — e.g. ones an **AI** coding assistant makes for you |
-| **`sign-me`** | the Secure Enclave, via Secretive (non-exportable) | Touch ID on every use | only after you approve | commits *you* personally vouch for, made on purpose via `git me` |
+| Key | Where it lives | Protection | How it signs | Its job |
+|-----|----------------|------------|--------------|---------|
+| **`sign-ai`** | a file on disk (`~/.ssh/sign-ai`), no passphrase | filesystem permissions | automatically, no prompt | the **default** signature on every commit — makes commits show as **Verified** on GitHub and proves they come from **your machine(s)**, including ones an **AI** assistant makes for you |
+| **`sign-me`** | the Secure Enclave, via Secretive (non-exportable) | Touch ID on every use | only when you ask, via `git me` | **marks the commits you made by hand** — a deliberate, human signature that distinguishes your manual work from automated commits; this is where the fork shows you the hash of what you sign |
 
-The idea: let low-stakes, high-volume commits flow without friction (`sign-ai`), but require a
-deliberate, verified human action for the ones that matter (`sign-me`) — and that's exactly where
-this fork shows you the hash of what you're about to sign.
+So `sign-ai` answers *"did this come from my machine?"* — it signs everything automatically so all
+your commits are Verified on GitHub (provenance). `sign-me` answers *"did I personally make this
+one?"* — a deliberate, Touch-ID-protected human signature, applied via `git me`, where you also
+check the hash of exactly what's being signed.
 
 ### Create the keys
 

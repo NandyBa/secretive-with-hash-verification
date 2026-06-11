@@ -16,10 +16,11 @@ background program — the **SSH agent** — uses that key to sign things, like 
 really came from you. Each time the agent is about to sign, your Mac asks you to confirm with Touch
 ID, which is what unlocks the key.
 
-This matters more than ever now that an **AI** coding assistant can write code and even make commits
-for you. The setup: the AI's routine commits are signed automatically by an ordinary key, while
-*your* important commits are signed with the Secure Enclave key, which only signs after you approve
-with Touch ID. The whole point is to be sure of *what* you're approving.
+This matters more than ever now that an **AI** assistant can write code and even make commits for
+you. So here, *every* commit is automatically signed by an on-disk key — proof it came from your
+machine, shown as *Verified* on GitHub. The commits you write *by hand* are instead signed with the
+Secure Enclave key, which needs your Touch ID — a deliberate mark that *you personally* made them.
+The whole point is to be sure of *what* you're approving when you do.
 
 **The gap in the normal app:** the prompt tells you *which* key will sign and *which* app asked —
 but not *what* is being signed. A hacked program, or a confused AI agent, could show you one thing
