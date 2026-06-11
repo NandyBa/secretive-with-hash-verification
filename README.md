@@ -9,6 +9,36 @@ Secretive is an app for protecting and managing SSH keys with the Secure Enclave
 </picture>
 
 
+## This fork — signature hash verification (by [Nandy Bâ](https://github.com/NandyBa))
+
+This is a fork of Secretive maintained by **Nandy Bâ ([@NandyBa](https://github.com/NandyBa))**.
+It adds one focused capability on top of upstream Secretive: when the agent asks you to authorize
+a signature, the **Touch ID prompt also shows the SHA-256 of the exact bytes it is about to
+sign** (plus the SSHSIG `namespace` and hash algorithm for git commits).
+
+### Why this matters
+
+Upstream Secretive tells you *which* key is signing and *which* app requested it — but not *what*
+is being signed. The agent only ever receives an opaque blob (never the commit message in clear),
+so it can't show the message — but it can show a hash of those exact bytes. By reproducing that
+same hash on your side, in the terminal, and comparing the two, you confirm that the signature you
+authorize really corresponds to the commit in front of you. That defeats a class of attacks where
+a compromised client asks you to sign something other than what's on screen.
+
+### What it brings
+
+- **A verifiable Touch ID prompt** — the SHA-256 of the precise payload being signed.
+- **A `git me` workflow** — signs a commit with your Secure Enclave key (Touch ID) and prints the
+  same hash in your terminal so you can compare it with the prompt before approving. Pairs with a
+  default on-disk key (`sign-ai`) that signs routine commits automatically, while `sign-me`
+  (Secure Enclave) is used deliberately via `git me`.
+- **Terminal-side verification tooling** — a signing wrapper and a transparent agent-socket proxy
+  that reproduce / capture the exact bytes, with no third-party dependencies.
+
+See **[`Tools/hash-verify/README.md`](Tools/hash-verify/README.md)** for the full details: which
+exact bytes are hashed, the `git me` setup, and how to build this fork under your own Apple
+identity (config-only — no source edits).
+
 ## Why?
 
 ### Safer Storage
