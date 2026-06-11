@@ -1,0 +1,14 @@
+#!/bin/bash
+# git me -> commit signed by the Secure Enclave key ("sign-me") via Secretive, printing the
+# SHA-256 of the exact bytes about to be signed so you can compare it with the Touch ID prompt.
+#
+# Install: put this on your PATH named `git-me` (then `git me ...` runs it) and `chmod +x` it.
+# Adjust the two paths below to your setup.
+SIGNER="$HOME/Documents/secretive-with-hash-verification/Tools/hash-verify/git-me-signer.py"
+SIGNING_KEY="$HOME/.ssh/secretive_sign-me.pub"   # public key of your Secure Enclave 'sign-me' key
+
+exec git \
+  -c gpg.format=ssh \
+  -c user.signingkey="$SIGNING_KEY" \
+  -c gpg.ssh.program="$SIGNER" \
+  commit -S "$@"

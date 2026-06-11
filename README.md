@@ -9,6 +9,41 @@ Secretive is an app for protecting and managing SSH keys with the Secure Enclave
 </picture>
 
 
+## This fork — check what you sign (by [Nandy Bâ](https://github.com/NandyBa))
+
+Secretive keeps a secret key locked inside a special chip on your Mac (the Secure Enclave). A small
+background program — the **SSH agent** — uses that key to sign things, like proving a Git commit
+really came from you. Each time the agent is about to sign, your Mac asks you to confirm with Touch
+ID, which is what unlocks the key.
+
+This matters more than ever now that an **AI** assistant can write code and even make commits for
+you. So here, *every* commit is automatically signed by an on-disk key — proof it came from your
+machine, shown as *Verified* on GitHub. The commits you write *by hand* are instead signed with the
+Secure Enclave key, which needs your Touch ID — a deliberate mark that *you personally* made them.
+The whole point is to be sure of *what* you're approving when you do.
+
+**The gap in the normal app:** the prompt tells you *which* key will sign and *which* app asked —
+but not *what* is being signed. A hacked program, or a confused AI agent, could show you one thing
+on screen and quietly ask the agent to sign something else.
+
+**What this fork adds:** the prompt now also shows a short **code** — the SHA-256 of the exact data
+about to be signed. Change even one character of that data and the code comes out completely
+different. You recompute that same code yourself — from the commit in front of you, with the
+included `git me` command — and compare:
+
+- same code → approve ✅
+- different code → stop ❌
+
+Think of it like a checksum (a short summary number): the same data always gives the same code.
+
+Two honest notes. It doesn't *block* a bad signature on its own — it lets you *catch* one, as long
+as the code you compare against comes from something you trust (the commit you actually meant to
+make). And the signing itself is unchanged: the exact same data is used for the code you see and for
+what actually gets signed, so the two can't drift apart.
+
+> Want the technical details, or to build this version yourself? See
+> [`Tools/hash-verify/README.md`](Tools/hash-verify/README.md).
+
 ## Why?
 
 ### Safer Storage
